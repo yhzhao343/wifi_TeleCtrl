@@ -5,6 +5,7 @@
 #define APPEND_CHILDREN(x)   children : x, length : ARRAY_LENGTH(x)
 #define AJSON_IS_EMPTY(x)    ((x->type == aJson_Object) && ! (x->child))
 #define IS_AUTO 15
+#define DISPLAY_MOUNT 16
 #define FOCUSER_DIR1 12
 #define FOCUSER_DIR2 6
 #define MANUAL_MODE_CHANGE 11
@@ -12,9 +13,9 @@
 #define DEBOUNCE_DELAY 50
 #define LCD_REFRESH_INTERVAL 30
 #define INVERVAL_REFRESH_INTERVAL 200
-#define MOUNT_POS_REFRESH_INTERVAL 200
+#define MOUNT_POS_REFRESH_INTERVAL 250
 #define MOUNT_TRECKING_REFRESH_INTERVAL 2000
-#define EXECUTE_MOUNT_CMD_INTERVAL 100
+#define EXECUTE_MOUNT_CMD_INTERVAL 200
 #define INTERVAL_LIMIT_1_LOWER 1500
 #define INTERVAL_LIMIT_1_UPPER 50000
 #define INTERVAL_LIMIT_2_LOWER 3000
@@ -38,6 +39,7 @@ int manual_step_mode = 1;
 int step_interval = 10000;
 int stepper_motor_pins[] = {2,3,4,5};
 char inputString[200];
+char goto_string[19];
 int input_cursor = 0;
 boolean stringComplete = false;
 
@@ -72,7 +74,9 @@ typedef enum {
     IDLE,
     GET_RA_DEC,
     GET_TRACKING,
-    SET_TRACKING
+    SET_TRACKING,
+    GOTO,
+    SLEW
 } MOUNT_OPTION;
 
 
@@ -110,13 +114,6 @@ mount_cmd mount_cmd_buff[5] = {
         cmd: NULL
     }
 };
-
-typedef enum {
-    FOCUSER_INFO,
-    MOUNT_INFO
-} DISPLAY_INFO;
-
-DISPLAY_INFO lcd_display_state = MOUNT_INFO;
 
 typedef enum {
     INVALID_API_REQUEST,
@@ -162,6 +159,12 @@ static int get_telescope_DEC(aJsonObject* request_child);
 static int validate_telescope_tracking(aJsonObject* request_child);
 static int set_telescope_tracking(aJsonObject* request_child);
 
+static int validate_goto(aJsonObject* request_child);
+static int set_goto(aJsonObject* request_child);
+
+static int validate_slew(aJsonObject* request_child);
+static int set_slew(aJsonObject* request_child);
+
 const static validate_set focuser_mode_setter = {
     validate : validate_focuser_mode,
     set : set_focuser_mode
@@ -175,6 +178,16 @@ const static validate_set focuser_interval_setter = {
 const static validate_set telescope_tracking_setter = {
     validate : validate_telescope_tracking,
     set : set_telescope_tracking
+};
+
+const static validate_set goto_setter = {
+    validate : validate_goto,
+    set : set_goto
+};
+
+const static validate_set slew_setter = {
+    validate : validate_slew,
+    set : set_slew
 };
 
 const static ctrl_node focuser_children[] = {
@@ -221,6 +234,22 @@ const static ctrl_node telescope_children[] = {
         children : NULL,
         length : 0
     },
+    {
+        type : ctrl_action_node,
+        string : "goto",
+        get : NULL,
+        setter : &goto_setter,
+        children: NULL,
+        length: 0
+    },
+    {
+        type : ctrl_action_node,
+        string : "slew",
+        get : NULL,
+        setter : &slew_setter,
+        children: NULL,
+        length: 0
+    }
 };
 
 const static ctrl_node root_children[] = {
@@ -325,6 +354,7 @@ static int get_ctrl_node_child_ndx(const ctrl_node* internal_parent, char* key) 
 }
 
 char tracking_cmd[] = {0x54, 0x02};
+char slew_cmd[] = {0x50, 0x02, 0x0f, 0x0f, 0xf, 0x00, 0x00, 0x00};
 void setup() {
     for(int i = 0; i < 4; i++){
         pinMode(stepper_motor_pins[i], OUTPUT);
@@ -333,6 +363,7 @@ void setup() {
     pinMode(FOCUSER_DIR1, INPUT_PULLUP);
     pinMode(FOCUSER_DIR2, INPUT_PULLUP);
     pinMode(MANUAL_MODE_CHANGE, INPUT_PULLUP);
+    pinMode(DISPLAY_MOUNT, INPUT_PULLUP);
     lcd.begin(16, 2);
     Serial.begin(9600);
     Serial2.begin(9600);
@@ -370,16 +401,7 @@ void loop() {
     cur_time = millis();
     if(cur_time - last_lcd_update > LCD_REFRESH_INTERVAL){
         lcd.clear();
-        if(FOCUSER_INFO == lcd_display_state){
-            lcd.setCursor(0,0);
-            lcd.print(F("mode:"));
-            lcd.setCursor(5,0);
-            lcd.print(step_mode);
-            lcd.setCursor(0,1);
-            lcd.print(F("INT:"));
-            lcd.setCursor(4,1);
-            lcd.print(step_interval);
-        } else if(MOUNT_INFO == lcd_display_state) {
+        if(digitalRead(DISPLAY_MOUNT)) {
             lcd.setCursor(0,0);
             lcd.print(F("RA:"));
             lcd.setCursor(3, 0);
@@ -392,6 +414,15 @@ void loop() {
             lcd.print(F("DEC:"));
             lcd.setCursor(4, 1);
             lcd.print(cur_DEC, 5);
+        } else {
+            lcd.setCursor(0,0);
+            lcd.print(F("mode:"));
+            lcd.setCursor(5,0);
+            lcd.print(step_mode);
+            lcd.setCursor(0,1);
+            lcd.print(F("INT:"));
+            lcd.setCursor(4,1);
+            lcd.print(step_interval);
         }
         last_lcd_update = cur_time;
     }
@@ -401,15 +432,16 @@ void loop() {
         manual_interval_raw = (int)((double)analogRead(MANUAL_INTERVAL) / MUM_INTERVAL);
         if(last_manual_interval_raw != manual_interval_raw){
             if(1 == manual_step_mode){
-                step_interval = INTERVAL_LIMIT_2_LOWER + (int)((double)manual_interval_raw * (double)(INTERVAL_LIMIT_2_UPPER - INTERVAL_LIMIT_2_LOWER)/MUM_INTERVAL);
-            } else {
                 step_interval = INTERVAL_LIMIT_1_LOWER + (int)((double)manual_interval_raw * (double)(INTERVAL_LIMIT_1_UPPER - INTERVAL_LIMIT_1_LOWER)/MUM_INTERVAL);
+            } else {
+               step_interval = INTERVAL_LIMIT_2_LOWER + (int)((double)manual_interval_raw * (double)(INTERVAL_LIMIT_2_UPPER - INTERVAL_LIMIT_2_LOWER)/MUM_INTERVAL);
             }
             timer0.end();
             timer0.begin(step, step_interval);
             last_manual_interval_update = cur_time;
+            last_manual_interval_raw = manual_interval_raw;
         }
-        last_manual_interval_raw = manual_interval_raw;
+
     }
 
     if(cur_time - last_mount_pos_update > MOUNT_POS_REFRESH_INTERVAL){
@@ -496,6 +528,7 @@ static void parse_mount(char* msg) {
         cur_cmd = mount_cmd_head - 1;
     }
     MOUNT_OPTION cur_mount_option = mount_cmd_buff[cur_cmd].status;
+    Serial.printf("current_processing_cmd: %d msg: %s cur_mount_option: %d\n", cur_cmd, msg, cur_mount_option);
     switch (cur_mount_option) {
         case GET_RA_DEC:
             if(18 == input_cursor2){
@@ -516,9 +549,8 @@ static void parse_mount(char* msg) {
         default:
             break;
     }
-    if(GET_RA_DEC == cur_mount_option){
-
-    }
+    mount_cmd_buff[cur_cmd].status = IDLE;
+    mount_cmd_buff[cur_cmd].cmd = NULL;
 }
 void step() {
     if(step_mode == 0){
@@ -557,8 +589,10 @@ static void parsing_error_handle(aJsonObject* request_child, ctrl_err_type error
             break;
         case WRONG_SET_TYPE:
             request_child -> valuestring = strdup((char*) F("Set failed: wrong input type"));
+            break;
         case OUT_OF_BOUND:
             request_child -> valuestring = strdup((char*) F("Set failed: winput out of bound"));
+            break;
         default:
             break;
     }
@@ -635,7 +669,30 @@ static int set_focuser_mode(aJsonObject* request_child) {
     step_mode = request_child -> valueint;
     return 1;
 }
-
+static int validate_goto(aJsonObject* request_child) {
+    return  1;
+}
+static int set_goto(aJsonObject* request_child) {
+    for(int i=0; i<18; i++){
+        goto_string[i] = (request_child -> valuestring)[i];
+    }
+    add_to_mount_queue(GOTO, NULL);
+    return  1;
+}
+static int validate_slew(aJsonObject* request_child) {
+    return 1;
+}
+static int set_slew(aJsonObject* request_child) {
+    char* string = request_child -> valuestring;
+    char axis = string[0] - 49;
+    char dir = string[1] - 49;
+    char vel = string[2] - '0';
+    slew_cmd[2] = axis;
+    slew_cmd[3] = dir;
+    slew_cmd[4] = vel;
+    add_to_mount_queue(SLEW, NULL);
+    return 1;
+}
 static int validate_focuser_interval(aJsonObject* request_child) {
     if(!validate_type(request_child, aJson_Int)){
         return 0;
@@ -674,12 +731,21 @@ static void add_to_mount_queue(MOUNT_OPTION option, char* cmd) {
         case SET_TRACKING:
             Serial.println("set tracking");
             cmd = tracking_cmd;
+            break;
+        case GOTO:
+            cmd = goto_string;
+            Serial.println(goto_string);
+            break;
+        case SLEW:
+            cmd = slew_cmd;
+        break;
         default:
             break;
           // do something
     }
     mount_cmd_buff[mount_cmd_tail].status = option;
     mount_cmd_buff[mount_cmd_tail].cmd = cmd;
+    Serial.printf("mount_cmd_tail: %d command sent: %s\n", mount_cmd_tail, cmd);
     mount_cmd_tail = (mount_cmd_tail + 1) % ARRAY_LENGTH(mount_cmd_buff);
 }
 
@@ -688,9 +754,14 @@ static void execute_mount_cmd() {
         if(0x54 == mount_cmd_buff[mount_cmd_head].cmd[0] && 0x00 == mount_cmd_buff[mount_cmd_head].cmd[1]){
             Serial2.write(0x54);
             Serial2.write(0x00);
+        } else if (SLEW == mount_cmd_buff[mount_cmd_tail].status) {
+            for(int i=0; i<8; i++){
+                Serial2.write(mount_cmd_buff[mount_cmd_head].cmd[i]);
+            }
         } else {
             Serial2.print(mount_cmd_buff[mount_cmd_head].cmd);
         }
         mount_cmd_head = (mount_cmd_head + 1) % ARRAY_LENGTH(mount_cmd_buff);
+        Serial.printf("mount_cmd_head: %d\n", mount_cmd_head);
     }
 }
