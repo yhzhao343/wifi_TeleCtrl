@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Telescope controller</title>
+</head>
+
+<body ng-app="teleCtrl">
+  <div>
+    <ul>
+      <li goto-page="home"> Home</li>
+      <li goto-page="camera"> Camera</li>
+      <li>Contact</li>
+      <li>About</li>
+    </ul>
+  </div>
+  <div>
+    <div ng-view></div>
+  </div>
+
+  <script src="./node_modules/angular/angular.js"></script>
+  <script src="./node_modules/angular-route/angular-route.js"></script>
+  <script src="./node_modules/socket.io-client/socket.io.js"></script>
+
+  <script src="./index.js"></script>
+  <script src="./d3Module.js"></script>
+  <script src="./star_settings.js"></script>
+  <script src="./star_database.js"></script>
+  <script src="./star_calc.js"></script>
+  <script src="./equipment.js"></script>
+  <script src="./routes.js"></script>
+  <script src="./directives.js"></script>
+  <script src="./com.js"></script>
+
+  <script src="./components/home/HomeCtrl.js"></script>
+  <script src="./components/camera/CameraCtrl.js"></script>
+  <link rel="stylesheet" href="./index.css">
+</body>
+
+</html>

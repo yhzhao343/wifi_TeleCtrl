@@ -1,0 +1,15 @@
+<div>
+    <p>testtesttest</p>
+    <div>
+      <textarea rows="30" cols="70" ng-model="info.debug"></textarea>
+    </div>
+    <div>
+        <button ng-repeat="(key, value) in cam.commandList" ng-click="cam[key]()">{{key}}</button>
+    </div>
+    <div>
+        <button ng-click="cam.pressShutter(); shutterPressed = true; startCounter()" ng-disabled="shutterPressed">pressShutter</button>
+        <button ng-click="cam.releaseShutter(); shutterPressed = false; clearCounter()" ng-disabled="!shutterPressed">releaseShutter</button>
+        <span ng-show="shutterPressed">{{counter}}</span>
+    </div>
+    <br/>
+</div>
