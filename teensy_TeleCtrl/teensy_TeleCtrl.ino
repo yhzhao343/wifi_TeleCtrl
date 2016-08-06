@@ -371,7 +371,7 @@ void setup() {
     timer0.begin(step, step_interval);
     manual_interval_raw = (int)((double)digitalRead(MANUAL_INTERVAL) / MUM_INTERVAL);
     last_manual_interval_raw = manual_interval_raw;
-    Serial.println(tracking_cmd);
+    // Serial.println(tracking_cmd);
     Serial2.print(tracking_cmd);
 }
 
@@ -528,7 +528,7 @@ static void parse_mount(char* msg) {
         cur_cmd = mount_cmd_head - 1;
     }
     MOUNT_OPTION cur_mount_option = mount_cmd_buff[cur_cmd].status;
-    Serial.printf("current_processing_cmd: %d msg: %s cur_mount_option: %d\n", cur_cmd, msg, cur_mount_option);
+    // Serial.printf("current_processing_cmd: %d msg: %s cur_mount_option: %d\n", cur_cmd, msg, cur_mount_option);
     switch (cur_mount_option) {
         case GET_RA_DEC:
             if(18 == input_cursor2){
@@ -729,12 +729,12 @@ static void add_to_mount_queue(MOUNT_OPTION option, char* cmd) {
           cmd = ((char*)(F("t")));
            break;
         case SET_TRACKING:
-            Serial.println("set tracking");
+            // Serial.println("set tracking");
             cmd = tracking_cmd;
             break;
         case GOTO:
             cmd = goto_string;
-            Serial.println(goto_string);
+            // Serial.println(goto_string);
             break;
         case SLEW:
             cmd = slew_cmd;
@@ -745,23 +745,27 @@ static void add_to_mount_queue(MOUNT_OPTION option, char* cmd) {
     }
     mount_cmd_buff[mount_cmd_tail].status = option;
     mount_cmd_buff[mount_cmd_tail].cmd = cmd;
-    Serial.printf("mount_cmd_tail: %d command sent: %s\n", mount_cmd_tail, cmd);
+    // Serial.printf("mount_cmd_tail: %d command sent: %s\n", mount_cmd_tail, cmd);
     mount_cmd_tail = (mount_cmd_tail + 1) % ARRAY_LENGTH(mount_cmd_buff);
 }
 
 static void execute_mount_cmd() {
     if(IDLE != mount_cmd_buff[mount_cmd_head].status){
-        if(0x54 == mount_cmd_buff[mount_cmd_head].cmd[0] && 0x00 == mount_cmd_buff[mount_cmd_head].cmd[1]){
-            Serial2.write(0x54);
-            Serial2.write(0x00);
-        } else if (SLEW == mount_cmd_buff[mount_cmd_tail].status) {
-            for(int i=0; i<8; i++){
-                Serial2.write(mount_cmd_buff[mount_cmd_head].cmd[i]);
-            }
-        } else {
-            Serial2.print(mount_cmd_buff[mount_cmd_head].cmd);
+        switch (mount_cmd_buff[mount_cmd_tail].status) {
+            case GET_TRACKING:
+                for(int i = 0; i < ARRAY_LENGTH(tracking_cmd); i++){
+                    Serial2.write(mount_cmd_buff[mount_cmd_head].cmd[i]);
+                }
+                break;
+            case SLEW:
+                for(int i = 0; i < ARRAY_LENGTH(slew_cmd); i++){
+                    Serial2.write(mount_cmd_buff[mount_cmd_head].cmd[i]);
+                }
+                break;
+            default:
+                Serial2.print(mount_cmd_buff[mount_cmd_head].cmd);
+                break;
         }
         mount_cmd_head = (mount_cmd_head + 1) % ARRAY_LENGTH(mount_cmd_buff);
-        Serial.printf("mount_cmd_head: %d\n", mount_cmd_head);
     }
 }
