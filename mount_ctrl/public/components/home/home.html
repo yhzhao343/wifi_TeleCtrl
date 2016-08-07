@@ -1,5 +1,15 @@
 <div>
-    <p>testtesttest</p>
+    <div>
+      <ul>
+        <li goto-page="home"> Home</li>
+        <li goto-page="camera"> Camera</li>
+        <li>Contact</li>
+        <li>About</li>
+      </ul>
+    </div>
+    <br/>
+    <br/>
+    <br/>
     <div>
     <table>
       <tr>
@@ -25,7 +35,7 @@
                   </tr>
                   <tr>
                     <td>RA</td>
-                    <td>{{star_settings.cur_star.ra}}</td>
+                    <td>{{star_settings.cur_star.ra * 15}}</td>
                   </tr>
                   <tr>
                     <td>DEC</td>
@@ -49,13 +59,14 @@
                   </tr>
                   <tr>
                     <!-- td><button  ng-click = "telescope.connect()"> connect </button></td> -->
-                    <td> <button ng-click="goto_star()" ng-disabled="telescope.in_goto"> goto </button> </td>
+                    <td> <button ng-click="goto_star()" ng-disabled="telescope.in_goto || telescope.tracking == 1"> goto </button> </td>
+                    <td> <button ng-click="cancel_goto()" ng-show="telescope.in_goto || telescope.tracking == 1">cancel goto</button></td>
                   </tr>
                   <tr>
                     <td>
                       <select ng-model="telescope.tracking">
                         <option value="0">off</option>
-                        <option value="1">Solar</option>
+                        <!-- <option value="1">Dec moving</option> -->
                         <option value="2">Sidereal</option>
                         <option value="3">Sidereal+PEC</option>
                       </select>

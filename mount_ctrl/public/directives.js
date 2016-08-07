@@ -120,6 +120,22 @@
                     .attr("stroke-width", 1)
                     .attr("stroke", "blue")
                 };
+                svg.append("line")
+                .attr('id', 'scope_pos_x')
+                .attr('x1', star_database.pointing_pos.x-10)
+                .attr('y1', star_database.pointing_pos.y)
+                .attr('x2', star_database.pointing_pos.x+10)
+                .attr('y2', star_database.pointing_pos.y)
+                .attr('stroke', 'green')
+                .attr('stroke-width', 1)
+                svg.append("line")
+                .attr('id', 'scope_pos_y')
+                .attr('x1', star_database.pointing_pos.x)
+                .attr('y1', star_database.pointing_pos.y-10)
+                .attr('x2', star_database.pointing_pos.x)
+                .attr('y2', star_database.pointing_pos.y+10)
+                .attr('stroke', 'green')
+                .attr('stroke-width', 1)
 
                 function draw_cur_star() {
                     if (star_settings.cur_star) {
@@ -166,7 +182,7 @@
                 interval = $interval(function() {
                     d3.select("#star_map").remove();
                     promise = promise.then(draw_star_map);
-                }, 5000);
+                }, 1000);
                 deferred.resolve();
                 return deferred.promise
             })

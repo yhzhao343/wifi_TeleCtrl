@@ -121,7 +121,13 @@ io.on('connect', function(socket) {
         send_json_msg(data);
     })
     socket.on('get_in_goto', function(data) {
-        send_json_msg({telescope:{in_goto:{}}});
+        send_json_msg({telescope:{in_goto:{}, tracking:{}}});
+    })
+    socket.on('cancel_goto', function(data) {
+        send_json_msg({telescope:{in_goto:false}});
+    })
+    socket.on('get_scope_pos', function(data) {
+        send_json_msg({telescope:{EQ_Coord:{}}});
     })
     port.on('data', function(data) {
         console.log("recieve: " + data)
@@ -129,10 +135,14 @@ io.on('connect', function(socket) {
             data = JSON.parse(data)
             if (data) {
                 if (data.telescope) {
-                    if (data.telescope.in_goto === true || data.telescope.in_goto === false) {
-                        console.log(data.telescope.in_goto)
-                        socket.emit('in_goto_info', data.telescope.in_goto)
+                    if ((data.telescope.in_goto === true || data.telescope.in_goto === false) && (data.telescope.tracking || data.telescope.tracking === 0)) {
+                        console.log(data.telescope);
+                        socket.emit('in_goto_info', data.telescope)
                     }
+                    if (data.telescope.EQ_Coord) {
+                        console.log(data.telescope.EQ_Coord);
+                        socket.emit('EQ_Coord', data.telescope.EQ_Coord);
+                    };
                 }
             }
         } catch(e) {

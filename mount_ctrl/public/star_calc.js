@@ -72,23 +72,37 @@
                     var zhor = x * Math.sin(deg2rad(90 - location.latitude)) + z * Math.cos(deg2rad(90 - location.latitude));
                     star.AZ = Math.atan2(yhor, xhor) + Math.PI;
                     star.ALT = Math.asin(zhor);
-                })
+                });
+                star_database.pointing_pos.HA = LST - star_database.pointing_pos.ra;
+                var x = Math.cos(deg2rad(star_database.pointing_pos.HA)) * Math.cos(deg2rad(star_database.pointing_pos.dec));
+                var y = Math.sin(deg2rad(star_database.pointing_pos.HA)) * Math.cos(deg2rad(star_database.pointing_pos.dec));
+                var z = Math.sin(deg2rad(star_database.pointing_pos.dec));
+                var xhor = x * Math.cos(deg2rad(90 - location.latitude)) - z * Math.sin(deg2rad(90 - location.latitude));
+                var yhor = y;
+                var zhor = x * Math.sin(deg2rad(90 - location.latitude)) + z * Math.cos(deg2rad(90 - location.latitude));
+                star_database.pointing_pos.AZ = Math.atan2(yhor, xhor) + Math.PI;
+                star_database.pointing_pos.ALT = Math.asin(zhor);
             },
             project:function() {
-                var visible_stars = [];
-                for (var i = 0; i < star_database.stars.length; i++) {
-                    var star = star_database.stars[i]
-                    var processed_star;
-                    switch(star_settings.projection) {
-                        case "polar" :
-                            processed_star = polar(star);
-                            break;
-                        case "stereo" :
-                            processed_star = stereo(star);
-                            break;
-                        default:
-                            processed_star = polar(star);
-                    }
+                switch(star_settings.projection) {
+                    case "polar":
+                        for (var i = 0; i < star_database.stars.length; i++) {
+                            polar(star_database.stars[i]);
+                        }
+                        polar(star_database.pointing_pos);
+                        break;
+                    case "stereo" :
+                        for (var i = 0; i < star_database.stars.length; i++) {
+                            stereo(star_database.stars[i]);
+                        }
+                        stereo(star_database.pointing_pos)
+                        break;
+                    default:
+                        for (var i = 0; i < star_database.stars.length; i++) {
+                            polar(star_database.stars[i]);
+                        }
+                        polar(star_database.pointing_pos);
+                        break;
                 }
             }
         };

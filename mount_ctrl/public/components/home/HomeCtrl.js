@@ -1,11 +1,14 @@
 (function() {
     'use strict'
     angular.module('teleCtrl.controller')
-    .controller('HomeCtrl', ['$scope', 'star_settings', 'telescope', 'socket', '$interval', function ($scope, star_settings, telescope, socket, $interval) {
+    .controller('HomeCtrl', ['$scope', 'star_settings', 'socket', '$interval','star_database', function ($scope, star_settings, socket, $interval, star_database) {
         star_settings.map_on = 1;
         $scope.star_settings = star_settings;
         $scope.telescope = {tracking:"2", slew:"4", in_goto:false};
         $scope.focuser = {mode:"1", interval:25750};
+        var get_scope_pos = $interval(function() {
+            socket.emit("get_scope_pos");
+        }, 1000)
         $scope.focuser_plus = function() {
             socket.emit('focuser_mode', parseInt($scope.focuser.mode));
         }
@@ -14,6 +17,10 @@
         }
         $scope.focuser_stop = function() {
             socket.emit('focuser_mode', 0);
+        }
+
+        $scope.cancel_goto = function() {
+            socket.emit('cancel_goto');
         }
 
         $scope.set_interval = function() {
@@ -33,12 +40,19 @@
             } , 500)
         }
 
-        socket.on('in_goto_info', function(data) {
-            console.log(data)
-            if (data == false) {
+        socket.on('in_goto_info', function(telescope) {
+            console.log(telescope)
+            if (telescope.in_goto == false && telescope.tracking != 1) {
                 $interval.cancel(ask_in_goto);
             };
-            $scope.telescope.in_goto = data;
+            $scope.telescope.in_goto = telescope.in_goto;
+            $scope.telescope.tracking = telescope.tracking.toString();
+        })
+
+        socket.on('EQ_Coord', function(coord) {
+            console.log(coord)
+            star_database.pointing_pos.ra = coord.RA;
+            star_database.pointing_pos.dec = coord.DEC;
         })
         $scope.set_tracking = function() {
             var msg = {telescope:{tracking:parseInt($scope.telescope.tracking)}}
