@@ -49,7 +49,7 @@
                   </tr>
                   <tr>
                     <!-- td><button  ng-click = "telescope.connect()"> connect </button></td> -->
-                    <td> <button ng-click="goto_star()"> goto </button> </td>
+                    <td> <button ng-click="goto_star()" ng-disabled="telescope.in_goto"> goto </button> </td>
                   </tr>
                   <tr>
                     <td>

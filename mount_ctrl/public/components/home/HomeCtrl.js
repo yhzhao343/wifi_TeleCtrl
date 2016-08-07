@@ -1,10 +1,10 @@
 (function() {
     'use strict'
     angular.module('teleCtrl.controller')
-    .controller('HomeCtrl', ['$scope', 'star_settings', 'telescope', 'socket', function ($scope, star_settings, telescope, socket) {
+    .controller('HomeCtrl', ['$scope', 'star_settings', 'telescope', 'socket', '$interval', function ($scope, star_settings, telescope, socket, $interval) {
         star_settings.map_on = 1;
         $scope.star_settings = star_settings;
-        $scope.telescope = {tracking:"2", slew:"4"};
+        $scope.telescope = {tracking:"2", slew:"4", in_goto:false};
         $scope.focuser = {mode:"1", interval:25750};
         $scope.focuser_plus = function() {
             socket.emit('focuser_mode', parseInt($scope.focuser.mode));
@@ -25,16 +25,21 @@
             var string = axis + dir + $scope.telescope.slew;
             socket.emit('set_slew', {telescope:{slew:string}});
         }
-
+        var ask_in_goto;
         $scope.goto_star = function() {
-            var ra = (Math.round(star_settings.cur_star.ra/360*16777216)).toString(16);
-            var dec = (Math.round(star_settings.cur_star.dec/360*16777216)).toString(16);
-            ra = "000000".substring(0, 6-ra.length) + ra + "00"
-            dec = "000000".substring(0, 6-dec.length) + dec + "00"
-            var string = "r" + ra.toUpperCase() + "," + dec.toUpperCase();
-            socket.emit("goto", {telescope:{goto:string}});
-            console.log(string);
+            socket.emit("goto", {telescope:{EQ_Coord:{RA:star_settings.cur_star.ra * 15, DEC:star_settings.cur_star.dec}}});
+            ask_in_goto = $interval(function() {
+                socket.emit("get_in_goto")
+            } , 500)
         }
+
+        socket.on('in_goto_info', function(data) {
+            console.log(data)
+            if (data == false) {
+                $interval.cancel(ask_in_goto);
+            };
+            $scope.telescope.in_goto = data;
+        })
         $scope.set_tracking = function() {
             var msg = {telescope:{tracking:parseInt($scope.telescope.tracking)}}
             socket.emit("set_tracking", msg);

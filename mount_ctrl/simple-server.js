@@ -67,9 +67,7 @@ var port = new SerialPort('/dev/ttyACM0', {
     parser:parsers.readline('\n'),
     lock:false
 });
-port.on('data', function(data) {
-    console.log(data)
-})
+
 port.on('error', function(err) {
     console.log('Error:' + err.message)
 })
@@ -121,6 +119,25 @@ io.on('connect', function(socket) {
     socket.on('set_slew', function(data) {
         console.log(data);
         send_json_msg(data);
+    })
+    socket.on('get_in_goto', function(data) {
+        send_json_msg({telescope:{in_goto:{}}});
+    })
+    port.on('data', function(data) {
+        console.log("recieve: " + data)
+        try{
+            data = JSON.parse(data)
+            if (data) {
+                if (data.telescope) {
+                    if (data.telescope.in_goto === true || data.telescope.in_goto === false) {
+                        console.log(data.telescope.in_goto)
+                        socket.emit('in_goto_info', data.telescope.in_goto)
+                    }
+                }
+            }
+        } catch(e) {
+            console.log(data)
+        }
     })
 });
 
