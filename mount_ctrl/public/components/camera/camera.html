@@ -22,5 +22,13 @@
         <button ng-click="cam.releaseShutter(); shutterPressed = false; clearCounter()" ng-disabled="!shutterPressed">releaseShutter</button>
         <span ng-show="shutterPressed">{{counter}}</span>
     </div>
+    <div>
+        <input type="text" ng-model="fileName"/>
+        <button ng-disabled="!fileName", ng-click="download()"> Download file</button>
+    </div>
+    <div>
+        <input type="text" ng-model="custom_gphoto2_cmd"/>
+        <button ng-disabled="!custom_gphoto2_cmd", ng-click="send_custom_gphoto2_cmd()"> Send custom command</button>
+    </div>
     <br/>
 </div>

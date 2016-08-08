@@ -8,7 +8,7 @@ var file = new static.Server('./public');
 var Q = require('q');
 var server = require('http').createServer(serverhandle);
 var io = require('socket.io')(server);
-
+var gphoto2 = "gphoto2 ";
 function serverhandle(req, resp) {
     req.addListener('end', function() {
         file.serve(req,resp);
@@ -129,6 +129,22 @@ io.on('connect', function(socket) {
     socket.on('get_scope_pos', function(data) {
         send_json_msg({telescope:{EQ_Coord:{}}});
     })
+    socket.on('command', function(data) {
+        console.log(data);
+        auto_detect(data.command);
+    })
+    function auto_detect(command) {
+        console.log(command);
+        console.log(gphoto2 + command);
+        exec(gphoto2 + command, {cwd: '/home/yuhui/Projects/wifi_TeleCtrl/mount_ctrl/public/image'}, emitStdout)
+    }
+
+    function emitStdout(err, stdout, stderr) {
+        if (err) {
+            console.log(err);
+        };
+        socket.emit('debug', stdout)
+    }
     port.on('data', function(data) {
         console.log("recieve: " + data)
         try{
@@ -149,7 +165,12 @@ io.on('connect', function(socket) {
             console.log(data)
         }
     })
+
 });
+
+
+
+
 
 
 

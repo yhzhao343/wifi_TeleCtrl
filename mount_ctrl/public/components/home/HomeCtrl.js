@@ -58,5 +58,8 @@
             var msg = {telescope:{tracking:parseInt($scope.telescope.tracking)}}
             socket.emit("set_tracking", msg);
         }
+        $scope.cancel_get_pos = function() {
+            $interval.cancel(get_scope_pos);
+        }
     }])
 })();

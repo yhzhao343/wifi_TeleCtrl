@@ -1,7 +1,7 @@
 (function() {
     'use strict'
     angular.module('teleCtrl.controller')
-    .controller('CameraCtrl', ['$scope', 'cam', 'socket', '$interval', function ($scope, cam, socket, $interval) {
+    .controller('CameraCtrl', ['$scope', 'cam', 'socket', '$interval', '$window', function ($scope, cam, socket, $interval, $window) {
         $scope.counter = 0;
         var counterInterval = undefined;
         function incrementCounter() {
@@ -21,5 +21,15 @@
         socket.on('debug', function(message) {
             $scope.info.debug = message
         })
+        $scope.fileName="";
+        $scope.custom_gphoto2_cmd = ""
+        $scope.download = function() {
+            $window.open('http://127.0.0.1:8080/image/' + $scope.fileName);
+            $scope.custom_gphoto2_cmd = ""
+        }
+        $scope.send_custom_gphoto2_cmd = function() {
+            socket.emit('command', {command:$scope.custom_gphoto2_cmd})
+            $scope.custom_gphoto2_cmd = ""
+        }
     }])
 })();
