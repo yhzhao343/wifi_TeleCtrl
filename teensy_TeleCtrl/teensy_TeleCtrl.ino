@@ -79,6 +79,7 @@ typedef enum {
     SET_TRACKING,
     GOTO,
     GET_IN_GOTO,
+    CANCEL_GOTO,
     SLEW
 } MOUNT_OPTION;
 
@@ -178,6 +179,9 @@ static int validate_telescope_EQ_Coord_DEC(aJsonObject* request_child);
 static int set_telescope_EQ_Coord_RA(aJsonObject* request_child, void* mystique);
 static int set_telescope_EQ_Coord_DEC(aJsonObject* request_child, void* mystique);
 
+static int validate_telescope_in_goto(aJsonObject* request_child);
+static int set_telescope_in_goto(aJsonObject* request_child, void* mystique);
+
 const static validate_set focuser_mode_setter = {
     validate : validate_focuser_mode,
     set : set_focuser_mode
@@ -207,6 +211,12 @@ const static validate_set telescope_EQ_Coord_DEC_setter = {
     validate : validate_telescope_EQ_Coord_DEC,
     set : set_telescope_EQ_Coord_DEC
 };
+
+const static validate_set telescope_in_goto_setter = {
+    validate : validate_telescope_in_goto,
+    set : set_telescope_in_goto
+};
+
 const static ctrl_node focuser_children[] = {
     {
         type : ctrl_action_node,
@@ -264,7 +274,7 @@ const static ctrl_node telescope_children[] = {
         type : ctrl_action_node,
         string : "in_goto",
         get : get_telescope_in_goto,
-        setter : NULL,
+        setter : &telescope_in_goto_setter,
         children: NULL,
         length: 0
     },
@@ -348,6 +358,7 @@ static void parse_json(aJsonObject* request_parent, const ctrl_node* internal_pa
 
 
 static void get_entire_object(aJsonObject* request_child, const ctrl_node* internal_parent) {
+    // Serial.printf("get entire object: internal_parent: %s\n", internal_parent -> string);
     switch (internal_parent -> type) {
         case ctrl_action_node:
             {
@@ -380,27 +391,6 @@ static void get_entire_object(aJsonObject* request_child, const ctrl_node* inter
                 break;
             }
     }
-    if(ctrl_action_node == internal_parent -> type){
-        if(!internal_parent -> get){
-            parsing_error_handle(request_child, NOT_IMPLEMENTED);
-        } else {
-            ((get_func)(internal_parent -> get))(request_child);
-        }
-    } else if (ctrl_object_node == internal_parent -> type){
-        const ctrl_node* internal_children = internal_parent -> children;
-        for(int i = 0; i < internal_parent -> length; i++){
-            const ctrl_node* current_internal_node = &(internal_children[i]);
-            aJsonObject* newObject = aJson.createObject();
-            if(!newObject){
-                parsing_error_handle(request_child, NO_MEMORY);
-                return;
-            }
-            aJson.addItemToObject(request_child, current_internal_node -> string, newObject);
-            get_entire_object(newObject, current_internal_node);
-        }
-    } else {
-        parsing_error_handle(request_child, INTERNAL_CTRL_FAULT);
-    }
 }
 
 
@@ -420,7 +410,7 @@ static int get_ctrl_node_child_ndx(const ctrl_node* internal_parent, char* key) 
 
 char tracking_cmd[] = {0x54, 0x02};
 char slew_cmd[] = {0x50, 0x02, 0x0f, 0x0f, 0xf, 0x00, 0x00, 0x00};
-char goto_string[] = {0x72, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, '0', '0', 0x2c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, '0', '0'};
+char goto_string[] = {0x72, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, '0', '0', ',', 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, '0', '0'};
 void setup() {
     for(int i = 0; i < 4; i++){
         pinMode(stepper_motor_pins[i], OUTPUT);
@@ -683,7 +673,7 @@ static int telescope_EQ_Coord_parent(aJsonObject* request_child) {
     if((my_coord.ra)[0] && (my_coord.dec)[0]){
         for(int i = 0; i < 6; i++){
             goto_string[i + 1] = ((char*)(my_coord.ra))[i];
-            goto_string[i + 9] = ((char*)(my_coord.dec))[i];
+            goto_string[i + 10] = ((char*)(my_coord.dec))[i];
         }
         for(int i = 0; i < 18; i++){
             Serial.write(goto_string[i]);
@@ -789,7 +779,7 @@ static int validate_telescope_EQ_Coord_DEC(aJsonObject* request_child) {
         return 0;
     }
     double num = request_child -> valuefloat;
-    if(num < 0.0 || num > 90.0){
+    if(num < -90.0 || num > 90.0){
         parsing_error_handle(request_child, OUT_OF_BOUND);
         return 0;
     }
@@ -805,17 +795,15 @@ static void int_to_hex(char (*hex_string) [6], int num) {
     }
 }
 static int set_telescope_EQ_Coord_RA(aJsonObject* request_child, void* mystique) {
+    Serial.printf("RA: %d\n",(int)((request_child -> valuefloat)/360.0 * 16777216));
    int_to_hex(((coord*)mystique) -> ra, (int)((request_child -> valuefloat)/360.0 * 16777216));
     return 1;
 }
 
 static int set_telescope_EQ_Coord_DEC(aJsonObject* request_child, void* mystique) {
+    Serial.printf("DEC: %d\n", (int)((request_child -> valuefloat)/360.0 * 16777216));
     int_to_hex(((coord*)mystique) -> dec, (int)((request_child -> valuefloat)/360.0 * 16777216));
     return 1;
-}
-
-static int validate_goto(aJsonObject* request_child) {
-    return  1;
 }
 
 static int validate_slew(aJsonObject* request_child) {
@@ -835,6 +823,7 @@ static int set_slew(aJsonObject* request_child, void* mystique) {
 }
 static int validate_focuser_interval(aJsonObject* request_child) {
     if(!validate_type(request_child, aJson_Int)){
+        parsing_error_handle(request_child, WRONG_SET_TYPE);
         return 0;
     }
     int interval = request_child -> valueint;
@@ -859,6 +848,27 @@ static int set_focuser_interval(aJsonObject* request_child, void* mystique) {
     }
     return 1;
 }
+static int validate_telescope_in_goto(aJsonObject* request_child) {
+    if(!validate_type(request_child, aJson_Boolean)){
+        parsing_error_handle(request_child, WRONG_SET_TYPE);
+        return 0;
+    }
+    if(in_goto || cur_tracking_mode == 1){
+        if(true == request_child -> valuebool){
+            parsing_error_handle(request_child, INVALID_API_REQUEST);
+            return 0;
+        }
+        return 1;
+    }
+    parsing_error_handle(request_child, INVALID_API_REQUEST);
+    return 0;
+
+}
+static int set_telescope_in_goto(aJsonObject* request_child, void* mystique) {
+    add_to_mount_queue(CANCEL_GOTO, NULL);
+    return 1;
+}
+
 
 static void add_to_mount_queue(MOUNT_OPTION option, char* cmd) {
     switch (option) {
@@ -880,6 +890,9 @@ static void add_to_mount_queue(MOUNT_OPTION option, char* cmd) {
             break;
         case GET_IN_GOTO:
             cmd = ((char*)(F("L")));
+            break;
+        case CANCEL_GOTO:
+            cmd = ((char*)(F("M")));
             break;
         default:
             break;
