@@ -136,7 +136,7 @@ io.on('connect', function(socket) {
     function auto_detect(command) {
         console.log(command);
         console.log(gphoto2 + command);
-        exec(gphoto2 + command, {cwd: '/home/yuhui/Projects/wifi_TeleCtrl/mount_ctrl/public/image'}, emitStdout)
+        exec(gphoto2 + command, {cwd: '/home/pi/Projects/wifi_TeleCtrl/mount_ctrl/public/image/'}, emitStdout)
     }
 
     function emitStdout(err, stdout, stderr) {

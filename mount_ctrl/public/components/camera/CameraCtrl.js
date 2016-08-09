@@ -24,7 +24,7 @@
         $scope.fileName="";
         $scope.custom_gphoto2_cmd = ""
         $scope.download = function() {
-            $window.open('http://127.0.0.1:8080/image/' + $scope.fileName);
+            $window.open('http://192.168.0.15:8080/image/' + $scope.fileName);
             $scope.custom_gphoto2_cmd = ""
         }
         $scope.send_custom_gphoto2_cmd = function() {
