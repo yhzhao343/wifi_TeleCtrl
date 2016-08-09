@@ -1,0 +1,18 @@
+{
+  "name": "mount_ctrl",
+  "version": "1.0.0",
+  "description": "",
+  "main": "simple-server.js",
+  "dependencies": {
+    "node-static": "^0.7.8",
+    "q": "^1.4.1",
+    "serialport": "^4.0.1",
+    "socket.io": "^1.4.8"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "node ./simple-server.js"
+  },
+  "author": "Yuhui",
+  "license": "ISC"
+}
